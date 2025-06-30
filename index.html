@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MangoRP Straffenpagina</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #333;
+      background: url('mangocity.png') no-repeat center top;
+      background-size: cover;
+      background-attachment: fixed;
+    }
+
+    header {
+      background-color: #ff8c00;
+      color: white;
+      padding: 1em;
+      display: flex;
+      align-items: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+
+    header img {
+      height: 40px;
+      margin-right: 15px;
+    }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 2em;
+      padding: 2em;
+    }
+
+    main {
+      flex: 1 1 550px;
+      padding: 2em;
+      background: white;
+      border-radius: 8px;
+      border: 3px solid #ffa726;
+      box-shadow: 0 0 15px rgba(0,0,0,0.1);
+      max-width: 800px;
+    }
+
+    aside {
+      flex: 0 0 300px;
+      background: #fff8ef;
+      border: 2px solid #ffa726;
+      border-radius: 8px;
+      padding: 1em;
+      box-shadow: 0 0 8px rgba(0,0,0,0.07);
+    }
+
+    aside h2 {
+      margin-top: 0;
+      font-size: 1.1em;
+      color: #d35400;
+    }
+
+    label {
+      display: block;
+      margin: 1em 0 0.25em;
+      font-weight: 600;
+    }
+
+    select, input[type="checkbox"], button, textarea {
+      padding: 0.6em 1em;
+      font-size: 1em;
+      border: 2px solid #ffb84d;
+      border-radius: 6px;
+      background-color: #fff8ef;
+      color: #333;
+      outline: none;
+    }
+
+    button {
+      background-color: #ffa726;
+      color: white;
+      border: none;
+      margin-top: 1em;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #ff9900;
+    }
+
+    .resultaat {
+      margin-top: 2em;
+      border-top: 1px solid #ffd699;
+      padding-top: 1em;
+    }
+
+    .resultaat p {
+      background-color: #fff2e6;
+      padding: 0.5em 1em;
+      border-radius: 4px;
+      margin: 0.5em 0;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 700px;
+      height: 350px;
+      margin: 3em auto 2em auto;
+      display: block;
+      background-color: rgba(255,255,255,0.95);
+      border-radius: 10px;
+      padding: 1em;
+      box-shadow: 0 0 12px rgba(0,0,0,0.1);
+    }
+
+    ul {
+      padding-left: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <img src="mango.png" alt="MangroRP Logo" />
+    <h1>MangoRP Straffen</h1>
+  </header>
+
+  <div class="container">
+    <main>
+      <label for="artikel">Kies artikel:</label>
+      <select id="artikel"></select>
+
+      <label for="keer">Kies keer:</label>
+      <select id="keer">
+        <option value="1">1e keer</option>
+        <option value="2">2e keer</option>
+        <option value="3">3e keer</option>
+        <option value="4">4e keer</option>
+        <option value="5">5e keer</option>
+        <option value="6">6e keer</option>
+      </select>
+
+      <label>
+        <input type="checkbox" id="starterCheckbox" onchange="updateTotaal()"> Minder dan 24 uur speeltijd (verdubbelt straf)
+      </label>
+
+      <button onclick="voegToe()">Voeg toe</button>
+
+      <div id="lijst" class="resultaat"></div>
+      <div id="totaal" class="resultaat"></div>
+
+      <div class="resultaat">
+        <label for="samenvatting">TX Samenvatting:</label>
+        <textarea id="samenvatting" rows="4" style="width: 100%; resize: vertical;"></textarea>
+      </div>
+    </main>
+
+    <aside>
+      <h2>📘 Missende artikelen</h2>
+
+      <h3>Artikel O.8 – Overmeesteren</h3>
+      <p>Wanneer je iemand hostage houdt, mag de tegenpartij je alleen overmeesteren als ze met <strong>minstens 2 man meer</strong> zijn dan jouw partij.</p>
+      <ul>
+        <li>1 vs 2 = ❌ te weinig</li>
+        <li>1 vs 3 = ✅ toegestaan</li>
+      </ul>
+      <p>De gehostagede telt niet mee. Iedereen moet zichtbaar zijn. Verstopt telt niet.</p>
+
+      <h3>Artikel O.12 – Wraakacties</h3>
+      <p>Wraak binnen 24 uur mag alleen in RP. Enkel op de dader gericht.</p>
+      <ul>
+        <li>Anderen vasthouden mag</li>
+        <li>Niet zomaar neerschieten</li>
+        <li><strong>Reden moet worden uitgesproken vóór actie</strong></li>
+      </ul>
+    </aside>
+  </div>
+
+  <canvas id="grafiek"></canvas>
+
+  <script>
+     const straffen = [ { id: 1, artikel: 'Artikel 1.1 VDM', keer: 1, uren: 2, gevolg: 'warn' },
+  { id: 1, artikel: 'Artikel 1.1 VDM', keer: 2, uren: 12, gevolg: '' },
+  { id: 2, artikel: 'Artikel 1.2 RDM', keer: 1, uren: 2, gevolg: 'warn' },
+  { id: 2, artikel: 'Artikel 1.2 RDM', keer: 2, uren: 12, gevolg: '' },
+{ id: 1, artikel: 'Artikel 1.1 VDM', keer: 3, uren: 24, gevolg: '' },
+  { id: 1, artikel: 'Artikel 1.1 VDM', keer: 4, uren: 168, gevolg: '' },
+  { id: 1, artikel: 'Artikel 1.1 VDM', keer: 5, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+  { id: 2, artikel: 'Artikel 1.2 RDM', keer: 3, uren: 48, gevolg: '' },
+  { id: 2, artikel: 'Artikel 1.2 RDM', keer: 4, uren: 168, gevolg: '' },
+  { id: 2, artikel: 'Artikel 1.2 RDM', keer: 5, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+ { id: 3, artikel: 'Artikel 1.3 Massa VDM/RDM', keer: 1, uren: 24, gevolg: '' },
+  { id: 3, artikel: 'Artikel 1.3 Massa VDM/RDM', keer: 2, uren: 168, gevolg: '' },
+  { id: 3, artikel: 'Artikel 1.3 Massa VDM/RDM', keer: 3, uren: 336, gevolg: '' },
+  { id: 3, artikel: 'Artikel 1.3 Massa VDM/RDM', keer: 4, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+  { id: 4, artikel: 'Artikel 2. FAIL RP/Powergaming', keer: 1, uren: 2, gevolg: 'Warn' },
+  { id: 4, artikel: 'Artikel 2. FAIL RP/Powergaming', keer: 2, uren: 12, gevolg: '' },
+  { id: 4, artikel: 'Artikel 2. FAIL RP/Powergaming', keer: 3, uren: 24, gevolg: '' },
+  { id: 4, artikel: 'Artikel 2. FAIL RP/Powergaming', keer: 4, uren: 168, gevolg: '' },
+  { id: 4, artikel: 'Artikel 2. FAIL RP/Powergaming', keer: 5, uren: 336, gevolg: '' },
+  { id: 4, artikel: 'Artikel 2. FAIL RP/Powergaming', keer: 6, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+  { id: 5, artikel: 'Artikel 3. (Cop)Baiten', keer: 1, uren: 2, gevolg: 'Warn' },
+  { id: 5, artikel: 'Artikel 3. (Cop)Baiten', keer: 2, uren: 12, gevolg: '' },
+  { id: 5, artikel: 'Artikel 3. (Cop)Baiten', keer: 3, uren: 24, gevolg: '' },
+  { id: 5, artikel: 'Artikel 3. (Cop)Baiten', keer: 4, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+  { id: 6, artikel: 'Artikel 4. NVOL', keer: 1, uren: 12, gevolg: '' },
+  { id: 6, artikel: 'Artikel 4. NVOL', keer: 2, uren: 24, gevolg: '' },
+  { id: 6, artikel: 'Artikel 4. NVOL', keer: 3, uren: 48, gevolg: '' },
+  { id: 6, artikel: 'Artikel 4. NVOL', keer: 4, uren: 168, gevolg: '' },
+  { id: 6, artikel: 'Artikel 4. NVOL', keer: 5, uren: 336, gevolg: 'Perm ban' },
+  { id: 6, artikel: 'Artikel 4. NVOL', keer: 6, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+  { id: 7, artikel: 'Artikel 5. New Life Rule', keer: 1, uren: 2, gevolg: 'Warn' },
+  { id: 7, artikel: 'Artikel 5. New Life Rule', keer: 2, uren: 12, gevolg: '' },
+  { id: 7, artikel: 'Artikel 5. New Life Rule', keer: 3, uren: 24, gevolg: '' },
+  { id: 7, artikel: 'Artikel 5. New Life Rule', keer: 4, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+  { id: 8, artikel: 'Artikel 6. Offroad/GTA drivestyle', keer: 1, uren: 2, gevolg: 'Warn' },
+  { id: 8, artikel: 'Artikel 6. Offroad/GTA drivestyle', keer: 2, uren: 8, gevolg: '' },
+  { id: 8, artikel: 'Artikel 6. Offroad/GTA drivestyle', keer: 3, uren: 24, gevolg: '' },
+  { id: 8, artikel: 'Artikel 6. Offroad/GTA drivestyle', keer: 4, uren: 168, gevolg: '' },
+  { id: 9, artikel: 'Artikel 7. OOC praten/karakter breken', keer: 1, uren: 2, gevolg: 'Warn(50taken)' },
+  { id: 9, artikel: 'Artikel 7. OOC praten/karakter breken', keer: 2, uren: 2, gevolg: 'Warn(100taken)' },
+  { id: 9, artikel: 'Artikel 7. OOC praten/karakter breken', keer: 3, uren: 2, gevolg: 'Warn(150taken)' },
+  { id: 9, artikel: 'Artikel 7. OOC praten/karakter breken', keer: 4, uren: 8, gevolg: '' },
+{ id: 9, artikel: 'Artikel 7. OOC praten/karakter breken', keer: 5, uren: 16, gevolg: 'Perm ban' },
+{ id: 10, artikel: 'Artikel 8. Kloten/scenarios verstoren.', keer: 1, uren: 2, gevolg: 'Warn' },
+{ id: 10, artikel: 'Artikel 8. Kloten/scenarios verstoren.', keer: 2, uren: 12, gevolg: '' },
+{ id: 10, artikel: 'Artikel 8. Kloten/scenarios verstoren.', keer: 3, uren: 24, gevolg: '' },
+{ id: 10, artikel: 'Artikel 8. Kloten/scenarios verstoren.', keer: 4, uren: 168, gevolg: '' },
+{ id: 10, artikel: 'Artikel 8. Kloten/scenarios verstoren.', keer: 5, uren: 336, gevolg: 'Perm ban' },
+{ id: 10, artikel: 'Artikel 8. Kloten/scenarios verstoren.', keer: 6, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+{ id: 11, artikel: 'Artikel 9. Gang/mansions', keer: 1, uren: 2, gevolg: 'Warn' },
+{ id: 11, artikel: 'Artikel 9. Gang/mansions', keer: 2, uren: 24, gevolg: '' },
+{ id: 11, artikel: 'Artikel 9. Gang/mansions', keer: 3, uren: 168, gevolg: '' },
+{ id: 11, artikel: 'Artikel 9. Gang/mansions', keer: 4, uren: 730, gevolg: '' },
+{ id: 11, artikel: 'Artikel 9. Gang/mansions', keer: 5, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+{ id: 12, artikel: 'Artikel 10. Nederlandse taal', keer: 1, uren: 2, gevolg: 'Warn' },
+{ id: 12, artikel: 'Artikel 10. Nederlandse taal', keer: 2, uren: 12, gevolg: '' },
+{ id: 12, artikel: 'Artikel 10. Nederlandse taal', keer: 3, uren: 24, gevolg: '' },
+{ id: 12, artikel: 'Artikel 10. Nederlandse taal', keer: 4, uren: 168, gevolg: '' },
+{ id: 12, artikel: 'Artikel 10. Nederlandse taal', keer: 5, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+
+{ id: 13, artikel: 'Artikel 10.2 Disrespect naar staffleden2', keer: 1, uren: 12, gevolg: '' },
+{ id: 13, artikel: 'Artikel 10.2 Disrespect naar staffleden2', keer: 2, uren: 24, gevolg: '' },
+{ id: 13, artikel: 'Artikel 10.2 Disrespect naar staffleden2', keer: 3, uren: 168, gevolg: '' },
+{ id: 13, artikel: 'Artikel 10.2 Disrespect naar staffleden2', keer: 4, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+{ id: 14, artikel: 'Artikel 11. NEP impersonatie', keer: 1, uren: 2, gevolg: 'Warn+50taken' },
+{ id: 14, artikel: 'Artikel 11. NEP impersonatie', keer: 2, uren: 8, gevolg: '+50taken' },
+{ id: 14, artikel: 'Artikel 11. NEP impersonatie', keer: 3, uren: 24, gevolg: '' },
+{ id: 14, artikel: 'Artikel 11. NEP impersonatie', keer: 4, uren: 168, gevolg: '' },
+{ id: 14, artikel: 'Artikel 11. NEP impersonatie', keer: 5, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+
+{ id: 15, artikel: 'Artikel 12. Reports/straffzaken', keer: 1, uren: 2, gevolg: 'Warn' },
+{ id: 15, artikel: 'Artikel 12. Reports/straffzaken', keer: 2, uren: 8, gevolg: '' },
+{ id: 15, artikel: 'Artikel 12. Reports/straffzaken', keer: 3, uren: 12, gevolg: '' },
+{ id: 15, artikel: 'Artikel 12. Reports/straffzaken', keer: 4, uren: 16, gevolg: '' },
+{ id: 15, artikel: 'Artikel 12. Reports/straffzaken', keer: 5, uren: 48, gevolg: '' },
+{ id: 15, artikel: 'Artikel 12. Reports/straffzaken', keer: 6, uren: 0, gevolg: 'Perm ban+unban ticket na 1 maand' },
+{ id: 16, artikel: 'Artikel 13.1 Scammen (5-10M)/oplichten', keer: 1, uren: 72, gevolg: '' },
+{ id: 16, artikel: 'Artikel 13.1 Scammen (5-10M)/oplichten', keer: 2, uren: 168, gevolg: '' },
+{ id: 16, artikel: 'Artikel 13.1 Scammen (5-10M)/oplichten', keer: 3, uren: 336, gevolg: '' },
+{ id: 16, artikel: 'Artikel 13.1 Scammen (5-10M)/oplichten', keer: 4, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+{ id: 17, artikel: 'Artikel 13.2 Scammen (10M+)', keer: 1, uren: 168, gevolg: '' },
+{ id: 17, artikel: 'Artikel 13.2 Scammen (10M+)', keer: 2, uren: 336, gevolg: '' },
+{ id: 17, artikel: 'Artikel 13.2 Scammen (10M+)', keer: 3, uren: 504, gevolg: '' },
+{ id: 17, artikel: 'Artikel 13.2 Scammen (10M+)', keer: 4, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+{ id: 18, artikel: 'Artikel 13.3 Scammen giftcard', keer: 1, uren: 0, gevolg: 'Perm ban (minder dan 24u speeltijd)' },
+{ id: 18, artikel: 'Artikel 13.3 Scammen giftcard', keer: 1, uren: 720, gevolg: '1 maand ban (meer dan 24u speeltijd)' },
+{ id: 19, artikel: 'Artikel 14.1 Voertuigen mid scenario', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 19, artikel: 'Artikel 14.1 Voertuigen mid scenario', keer: 2, uren: 12, gevolg: '' },
+{ id: 19, artikel: 'Artikel 14.1 Voertuigen mid scenario', keer: 3, uren: 24, gevolg: '' },
+{ id: 19, artikel: 'Artikel 14.1 Voertuigen mid scenario', keer: 4, uren: 168, gevolg: '' },
+{ id: 19, artikel: 'Artikel 14.1 Voertuigen mid scenario', keer: 5, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+{ id: 20, artikel: 'Artikel 14.2 Landen van helikopters/voertuigen in greenzone', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 21, artikel: 'Artikel 14.3 Overheidsvoertuigen/voertuigen in greenzone stelen', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 22, artikel: 'Artikel 15. Realistisch/onrealistisch pitten', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 22, artikel: 'Artikel 15. Realistisch/onrealistisch pitten', keer: 2, uren: 12, gevolg: '' },
+{ id: 22, artikel: 'Artikel 15. Realistisch/onrealistisch pitten', keer: 3, uren: 24, gevolg: '' },
+{ id: 22, artikel: 'Artikel 15. Realistisch/onrealistisch pitten', keer: 4, uren: 48, gevolg: '' },
+{ id: 22, artikel: 'Artikel 15. Realistisch/onrealistisch pitten', keer: 5, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+{ id: 23, artikel: 'Artikel 16. Combatloggen', keer: 1, uren: 12, gevolg: '' },
+{ id: 23, artikel: 'Artikel 16. Combatloggen', keer: 2, uren: 24, gevolg: '' },
+{ id: 23, artikel: 'Artikel 16. Combatloggen', keer: 3, uren: 168, gevolg: '' },
+{ id: 23, artikel: 'Artikel 16. Combatloggen', keer: 4, uren: 336, gevolg: '' },
+{ id: 23, artikel: 'Artikel 16. Combatloggen', keer: 5, uren: 720, gevolg: '' },
+{ id: 23, artikel: 'Artikel 16. Combatloggen', keer: 6, uren: 1440, gevolg: '' },
+{ id: 24, artikel: 'Artikel 17. Garage/greenzone vluchten/campen', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 24, artikel: 'Artikel 17. Garage/greenzone vluchten/campen', keer: 2, uren: 8, gevolg: '' },
+{ id: 24, artikel: 'Artikel 17. Garage/greenzone vluchten/campen', keer: 3, uren: 12, gevolg: '' },
+{ id: 24, artikel: 'Artikel 17. Garage/greenzone vluchten/campen', keer: 4, uren: 24, gevolg: '' },
+{ id: 24, artikel: 'Artikel 17. Garage/greenzone vluchten/campen', keer: 5, uren: 168, gevolg: '' },
+{ id: 24, artikel: 'Artikel 17. Garage/greenzone vluchten/campen', keer: 6, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+{ id: 25, artikel: 'Artikel 18. Meta gamen', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 25, artikel: 'Artikel 18. Meta gamen', keer: 2, uren: 12, gevolg: '' },
+{ id: 25, artikel: 'Artikel 18. Meta gamen', keer: 3, uren: 24, gevolg: '' },
+{ id: 25, artikel: 'Artikel 18. Meta gamen', keer: 4, uren: 168, gevolg: '' },
+{ id: 25, artikel: 'Artikel 18. Meta gamen', keer: 5, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+
+{ id: 26, artikel: 'Artikel 19. Stream snipen ', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 26, artikel: 'Artikel 19. Stream snipen ', keer: 2, uren: 12, gevolg: '' },
+{ id: 26, artikel: 'Artikel 19. Stream snipen ', keer: 3, uren: 24, gevolg: '' },
+{ id: 26, artikel: 'Artikel 19. Stream snipen ', keer: 4, uren: 168, gevolg: '' },
+{ id: 26, artikel: 'Artikel 19. Stream snipen ', keer: 5, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+{ id: 27, artikel: 'Artikel 20. Ghost peaken ', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 27, artikel: 'Artikel 20. Ghost peaken ', keer: 2, uren: 8, gevolg: '' },
+{ id: 27, artikel: 'Artikel 20. Ghost peaken ', keer: 3, uren: 12, gevolg: '' },
+{ id: 27, artikel: 'Artikel 20. Ghost peaken ', keer: 4, uren: 24, gevolg: '' },
+{ id: 27, artikel: 'Artikel 20. Ghost peaken ', keer: 5, uren: 168, gevolg: '' },
+{ id: 27, artikel: 'Artikel 20. Ghost peaken ', keer: 6, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+{ id: 28, artikel: 'Artikel 21. Stemherkenning/vervorming ', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 28, artikel: 'Artikel 21. Stemherkenning/vervorming ', keer: 2, uren: 8, gevolg: '' },
+{ id: 28, artikel: 'Artikel 21. Stemherkenning/vervorming ', keer: 3, uren: 24, gevolg: '' },
+{ id: 28, artikel: 'Artikel 21. Stemherkenning/vervorming ', keer: 4, uren: 168, gevolg: '' },
+{ id: 28, artikel: 'Artikel 21. Stemherkenning/vervorming ', keer: 5, uren: 720, gevolg: '' },
+{ id: 29, artikel: 'Artikel 23.1 Lichte exploits/bug abuse', keer: 1, uren: 24, gevolg: '' },
+{ id: 29, artikel: 'Artikel 23.1 Lichte exploits/bug abuse', keer: 2, uren: 48, gevolg: '' },
+{ id: 29, artikel: 'Artikel 23.1 Lichte exploits/bug abuse', keer: 3, uren: 168, gevolg: '' },
+{ id: 29, artikel: 'Artikel 23.1 Lichte exploits/bug abuse', keer: 4, uren: 720, gevolg: '' },
+{ id: 29, artikel: 'Artikel 23.1 Lichte exploits/bug abuse', keer: 5, uren: 0, gevolg: 'Perm ban' },
+{ id: 30, artikel: 'Artikel 23.2 Zware exploits/bug abuse/duplicaten', keer: 1, uren: 0, gevolg: 'Perm ban + account wipe (geen unban mogelijk)' },
+{ id: 31, artikel: 'Artikel 23.3 Hacken, cheaten en/of spoofen', keer: 1, uren: 0, gevolg: 'Perm ban + account wipe (unban mogelijk na 6 maanden via ticket)' },
+
+{ id: 32, artikel: 'Artikel 23.4 Samenwerken of niet melden van een cheater en/of spoofer', keer: 1, uren: 168, gevolg: 'Minimale straf: 1 week ban' },
+{ id: 32, artikel: 'Artikel 23.4 Samenwerken of niet melden van een cheater en/of spoofer', keer: 2, uren: 720, gevolg: 'Maximale straf: 1 maand ban' },
+
+{ id: 33, artikel: 'Artikel 24.  IRL trading', keer: 1, uren: 0, gevolg: 'Perm ban + account wipe' },
+
+{ id: 34, artikel: 'Artikel 25. Adresgegevens lekken onder inwoners', keer: 1, uren: 1440, gevolg: '' },
+{ id: 35, artikel: 'Artikel 25.1 Adresgegevens lekken over stafleden', keer: 1, uren: 0, gevolg: 'Perm ban' },
+{ id: 36, artikel: 'Artikel 25.2 DDos-bedreigingen of IPs delen onder inwoners', keer: 1, uren: 720, gevolg: '' },
+{ id: 37, artikel: 'Artikel 25.3 DDos/IP richting staf', keer: 1, uren: 0, gevolg: 'Perm ban' },
+
+{ id: 38, artikel: 'Artikel 26. Bedreigingen', keer: 1, uren: 24, gevolg: '' },
+{ id: 38, artikel: 'Artikel 26. Bedreigingen', keer: 2, uren: 48, gevolg: '' },
+{ id: 38, artikel: 'Artikel 26. Bedreigingen', keer: 3, uren: 168, gevolg: '' },
+{ id: 38, artikel: 'Artikel 26. Bedreigingen', keer: 4, uren: 336, gevolg: '' },
+
+{ id: 62, artikel: 'Artikel 27. Liegen in een staffzaak/tegen stafflid', keer: 1, uren: 24, gevolg: '1 dag ban' },
+{ id: 62, artikel: 'Artikel 27. Liegen in een staffzaak/tegen stafflid', keer: 2, uren: 48, gevolg: '2 dagen ban' },
+{ id: 62, artikel: 'Artikel 27. Liegen in een staffzaak/tegen stafflid', keer: 3, uren: 168, gevolg: '1 week ban' },
+{ id: 62, artikel: 'Artikel 27. Liegen in een staffzaak/tegen stafflid', keer: 4, uren: 336, gevolg: '2 weken ban' },
+{ id: 62, artikel: 'Artikel 27. Liegen in een staffzaak/tegen stafflid', keer: 5, uren: 0, gevolg: 'Permanent verbannen (unban mogelijk na 1 maand)' },
+
+{ id: 39, artikel: 'Artikel 28. Negative content', keer: 1, uren: 12, gevolg: 'Ban tot video offline' },
+{ id: 39, artikel: 'Artikel 28. Negative content', keer: 2, uren: 24, gevolg: 'Ban tot video offline' },
+{ id: 39, artikel: 'Artikel 28. Negative content', keer: 3, uren: 168, gevolg: 'Ban tot video offline' },
+{ id: 39, artikel: 'Artikel 28. Negative content', keer: 4, uren: 336, gevolg: 'Ban tot video offline' },
+{ id: 39, artikel: 'Artikel 28. Negative content', keer: 5, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand + video offline' },
+
+{ id: 40, artikel: 'Artikel 29. MangoRP zwart maken', keer: 1, uren: 12, gevolg: '' },
+{ id: 40, artikel: 'Artikel 29. MangoRP zwart maken', keer: 2, uren: 24, gevolg: '' },
+{ id: 40, artikel: 'Artikel 29. MangoRP zwart maken', keer: 3, uren: 168, gevolg: '' },
+{ id: 40, artikel: 'Artikel 29. MangoRP zwart maken', keer: 4, uren: 336, gevolg: '' },
+{ id: 40, artikel: 'Artikel 29. MangoRP zwart maken', keer: 5, uren: 0, gevolg: 'Perm ban + unban ticket na 1 maand' },
+
+{ id: 41, artikel: 'Artikel 30. Vulgariteit&seksuele handelingen', keer: 1, uren: 0, gevolg: 'Perm ban (unban mogelijk na 6 maanden)' },
+
+{ id: 42, artikel: 'Artikel 31. Opruiing', keer: 1, uren: 0, gevolg: 'warn' },
+{ id: 42, artikel: 'Artikel 31. Opruiing', keer: 2, uren: 8, gevolg: '' },
+{ id: 42, artikel: 'Artikel 31. Opruiing', keer: 3, uren: 12, gevolg: '' },
+{ id: 42, artikel: 'Artikel 31. Opruiing', keer: 4, uren: 24, gevolg: '' },
+{ id: 42, artikel: 'Artikel 31. Opruiing', keer: 5, uren: 48, gevolg: '' },
+                      
+{ id: 43, artikel: 'Artikel O.1 Rippen', keer: 1, uren: 8, gevolg: '' },
+{ id: 43, artikel: 'Artikel O.1 Rippen', keer: 2, uren: 12, gevolg: '' },
+{ id: 43, artikel: 'Artikel O.1 Rippen', keer: 3, uren: 24, gevolg: '' },
+{ id: 43, artikel: 'Artikel O.1 Rippen', keer: 4, uren: 168, gevolg: 'Gangkick' },
+{ id: 43, artikel: 'Artikel O.1 Rippen', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+
+{ id: 44, artikel: 'Artikel O.2 Invallen', keer: 1, uren: 2, gevolg: 'warn' },
+{ id: 44, artikel: 'Artikel O.2 Invallen', keer: 2, uren: 8, gevolg: '' },
+{ id: 44, artikel: 'Artikel O.2 Invallen', keer: 3, uren: 24, gevolg: '' },
+{ id: 44, artikel: 'Artikel O.2 Invallen', keer: 4, uren: 168, gevolg: 'Gangkick' },
+{ id: 44, artikel: 'Artikel O.2 Invallen', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+
+{ id: 45, artikel: 'Artikel O.3 Eiland/redzone ', keer: 1, uren: 8, gevolg: '' },
+{ id: 45, artikel: 'Artikel O.3 Eiland/redzone ', keer: 2, uren: 12, gevolg: '' },
+{ id: 45, artikel: 'Artikel O.3 Eiland/redzone ', keer: 3, uren: 24, gevolg: '' },
+{ id: 45, artikel: 'Artikel O.3 Eiland/redzone ', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 45, artikel: 'Artikel O.3 Eiland/redzone ', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+
+{ id: 46, artikel: 'Artikel O.4 Campen van ganghuizen/mansion ', keer: 1, uren: 8, gevolg: '' },
+{ id: 46, artikel: 'Artikel O.4 Campen van ganghuizen/mansion ', keer: 2, uren: 12, gevolg: '' },
+{ id: 46, artikel: 'Artikel O.4 Campen van ganghuizen/mansion ', keer: 3, uren: 24, gevolg: '' },
+{ id: 46, artikel: 'Artikel O.4 Campen van ganghuizen/mansion ', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 46, artikel: 'Artikel O.4 Campen van ganghuizen/mansion ', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+
+{ id: 47, artikel: 'Artikel O.5 Gang switch ', keer: 1, uren: 8, gevolg: '' },
+{ id: 47, artikel: 'Artikel O.5 Gang switch ', keer: 2, uren: 12, gevolg: '' },
+{ id: 47, artikel: 'Artikel O.5 Gang switch ', keer: 3, uren: 24, gevolg: '' },
+{ id: 47, artikel: 'Artikel O.5 Gang switch ', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 47, artikel: 'Artikel O.5 Gang switch ', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+
+{ id: 48, artikel: 'Artikel O.6 Laag niveau van roleplay ', keer: 1, uren: 8, gevolg: '' },
+{ id: 48, artikel: 'Artikel O.6 Laag niveau van roleplay ', keer: 2, uren: 12, gevolg: '' },
+{ id: 48, artikel: 'Artikel O.6 Laag niveau van roleplay ', keer: 3, uren: 24, gevolg: '' },
+{ id: 48, artikel: 'Artikel O.6 Laag niveau van roleplay ', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 48, artikel: 'Artikel O.6 Laag niveau van roleplay ', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+
+{ id: 49, artikel: 'Artikel O.7 Advocaten/anwb/ambulance hostage nemen ', keer: 1, uren: 8, gevolg: '' },
+{ id: 49, artikel: 'Artikel O.7 Advocaten/anwb/ambulance hostage nemen ', keer: 2, uren: 12, gevolg: '' },
+{ id: 49, artikel: 'Artikel O.7 Advocaten/anwb/ambulance hostage nemen ', keer: 3, uren: 24, gevolg: '' },
+{ id: 49, artikel: 'Artikel O.7 Advocaten/anwb/ambulance hostage nemen ', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 50, artikel: 'Artikel O.9 (Agenten) TH pakken ', keer: 1, uren: 8, gevolg: '' },
+{ id: 50, artikel: 'Artikel O.9 (Agenten) TH pakken ', keer: 2, uren: 12, gevolg: '' },
+{ id: 50, artikel: 'Artikel O.9 (Agenten) TH pakken ', keer: 3, uren: 24, gevolg: '' },
+{ id: 50, artikel: 'Artikel O.9 (Agenten) TH pakken ', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 50, artikel: 'Artikel O.9 (Agenten) TH pakken ', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 51, artikel: 'Artikel O.10 Rippen binnen een gang', keer: 1, uren: 8, gevolg: '' },
+{ id: 51, artikel: 'Artikel O.10 Rippen binnen een gang', keer: 2, uren: 12, gevolg: '' },
+{ id: 51, artikel: 'Artikel O.10 Rippen binnen een gang', keer: 3, uren: 24, gevolg: '' },
+{ id: 51, artikel: 'Artikel O.10 Rippen binnen een gang', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 51, artikel: 'Artikel O.10 Rippen binnen een gang', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 52, artikel: 'Artikel O.11 Outside-shooters en/of hinderlaag', keer: 1, uren: 8, gevolg: '' },
+{ id: 52, artikel: 'Artikel O.11 Outside-shooters en/of hinderlaag', keer: 2, uren: 12, gevolg: '' },
+{ id: 52, artikel: 'Artikel O.11 Outside-shooters en/of hinderlaag', keer: 3, uren: 24, gevolg: '' },
+{ id: 52, artikel: 'Artikel O.11 Outside-shooters en/of hinderlaag', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 52, artikel: 'Artikel O.11 Outside-shooters en/of hinderlaag', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 53, artikel: 'Artikel O.13 Wapen verkoop (twitter)', keer: 1, uren: 8, gevolg: '' },
+{ id: 53, artikel: 'Artikel O.13 Wapen verkoop (twitter)', keer: 2, uren: 12, gevolg: '' },
+{ id: 53, artikel: 'Artikel O.13 Wapen verkoop (twitter)', keer: 3, uren: 24, gevolg: '' },
+{ id: 53, artikel: 'Artikel O.13 Wapen verkoop (twitter)', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 53, artikel: 'Artikel O.13 Wapen verkoop (twitter)', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 54, artikel: 'Artikel O.14 Kloten bij ziekenhuis', keer: 1, uren: 8, gevolg: '' },
+{ id: 54, artikel: 'Artikel O.14 Kloten bij ziekenhuis', keer: 2, uren: 12, gevolg: '' },
+{ id: 54, artikel: 'Artikel O.14 Kloten bij ziekenhuis', keer: 3, uren: 24, gevolg: '' },
+{ id: 54, artikel: 'Artikel O.14 Kloten bij ziekenhuis', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 54, artikel: 'Artikel O.14 Kloten bij ziekenhuis', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 55, artikel: 'Artikel O.15 Aankoppelen scenario/fouten in scenario/eigen rechter spelen', keer: 1, uren: 8, gevolg: '' },
+{ id: 55, artikel: 'Artikel O.15 Aankoppelen scenario/fouten in scenario/eigen rechter spelen', keer: 2, uren: 12, gevolg: '' },
+{ id: 55, artikel: 'Artikel O.15 Aankoppelen scenario/fouten in scenario/eigen rechter spelen', keer: 3, uren: 24, gevolg: '' },
+{ id: 55, artikel: 'Artikel O.15 Aankoppelen scenario/fouten in scenario/eigen rechter spelen', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 55, artikel: 'Artikel O.15 Aankoppelen scenario/fouten in scenario/eigen rechter spelen', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 56, artikel: 'Artikel O.16 Ganghuizen/mansions', keer: 1, uren: 8, gevolg: '' },
+{ id: 56, artikel: 'Artikel O.16 Ganghuizen/mansions', keer: 2, uren: 12, gevolg: '' },
+{ id: 56, artikel: 'Artikel O.16 Ganghuizen/mansions', keer: 3, uren: 24, gevolg: '' },
+{ id: 56, artikel: 'Artikel O.16 Ganghuizen/mansions', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 56, artikel: 'Artikel O.16 Ganghuizen/mansions', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 57, artikel: 'Artikel O.17 Bank/winkel/overvallen/hostage', keer: 1, uren: 8, gevolg: '' },
+{ id: 57, artikel: 'Artikel O.17 Bank/winkel/overvallen/hostage', keer: 2, uren: 12, gevolg: '' },
+{ id: 57, artikel: 'Artikel O.17 Bank/winkel/overvallen/hostage', keer: 3, uren: 24, gevolg: '' },
+{ id: 57, artikel: 'Artikel O.17 Bank/winkel/overvallen/hostage', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 57, artikel: 'Artikel O.17 Bank/winkel/overvallen/hostage', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 58, artikel: 'Artikel O.18 Ghostbag/holster', keer: 1, uren: 8, gevolg: '' },
+{ id: 58, artikel: 'Artikel O.18 Ghostbag/holster', keer: 2, uren: 12, gevolg: '' },
+{ id: 58, artikel: 'Artikel O.18 Ghostbag/holster', keer: 3, uren: 24, gevolg: '' },
+{ id: 58, artikel: 'Artikel O.18 Ghostbag/holster', keer: 4, uren: 168, gevolg: 'Eventuele gangkick' },
+{ id: 58, artikel: 'Artikel O.18 Ghostbag/holster', keer: 5, uren: 720, gevolg: '3 maanden gangs blacklist' },
+{ id: 59, artikel: 'Artikel OH.1 Overheidfix/abuse', keer: 1, uren: 24, gevolg: 'Strike + 1 dag ban' },
+{ id: 59, artikel: 'Artikel OH.1 Overheidfix/abuse', keer: 2, uren: 24, gevolg: 'Ontslag + 1 dag ban' },
+{ id: 60, artikel: 'Artikel OH.2 Overheidnewlife abuse', keer: 1, uren: 24, gevolg: 'Strike + 1 dag ban' },
+{ id: 60, artikel: 'Artikel OH.2 Overheidnewlife abuse', keer: 2, uren: 24, gevolg: 'Ontslag + 1 dag ban' },
+{ id: 61, artikel: 'Artikel OH.3 Corruptie overheid', keer: 1, uren: 720, gevolg: '1 t/m 6 maanden ban + ontslag + Blacklist' }
+
+];
+
+    const artikelSelect = document.getElementById('artikel');
+    const uniekeArtikelen = [...new Set(straffen.map(s => s.artikel))];
+    uniekeArtikelen.forEach(art => {
+      const opt = document.createElement('option');
+      opt.value = art;
+      opt.textContent = art;
+      artikelSelect.appendChild(opt);
+    });
+
+    let totaalUren = 0;
+    let alleGevolgen = [];
+    let samenvattingTekst = [];
+
+    const tellingen = JSON.parse(localStorage.getItem('tellingData')) || {};
+    const ctx = document.getElementById('grafiek').getContext('2d');
+    let chart;
+
+    window.addEventListener('DOMContentLoaded', updateGrafiek);
+
+    function voegToe() {
+      const gekozenArtikel = document.getElementById('artikel').value;
+      const gekozenKeer = parseInt(document.getElementById('keer').value);
+      const match = straffen.find(s => s.artikel === gekozenArtikel && s.keer === gekozenKeer);
+      const lijstDiv = document.getElementById('lijst');
+
+      if (match) {
+        const p = document.createElement('p');
+        p.innerHTML = `<strong>${match.artikel}</strong> – ${match.uren} uur` +
+          (match.gevolg ? ` – ${match.gevolg}` : '');
+        lijstDiv.appendChild(p);
+
+        totaalUren += match.uren;
+        if (match.gevolg) alleGevolgen.push(match.gevolg);
+
+        const keerLabel = `${match.keer}e keer`;
+        const artikelRegel = `${match.artikel} ${keerLabel}`;
+        samenvattingTekst.push(artikelRegel);
+        updateSamenvatting();
+        updateTotaal();
+
+        tellingen[match.artikel] = (tellingen[match.artikel] || 0) + 1;
+        localStorage.setItem('tellingData', JSON.stringify(tellingen));
+        updateGrafiek();
+      } else {
+        alert('Geen straf gevonden voor deze combinatie.');
+      }
+    }
+
+    function updateTotaal() {
+      const checkbox = document.getElementById('starterCheckbox');
+      const totaalDiv = document.getElementById('totaal');
+      const multiplier = checkbox.checked ? 2 : 1;
+      const aangepasteUren = totaalUren * multiplier;
+
+            totaalDiv.innerHTML = `<hr><strong>Totaal: ${aangepasteUren} uur</strong><br>` +
+        (alleGevolgen.length ? `Gevolgen: ${[...new Set(alleGevolgen)].join(', ')}` : '');
+    }
+
+    function updateSamenvatting() {
+      const veld = document.getElementById('samenvatting');
+      veld.value = samenvattingTekst.join(' | ');
+    }
+
+    function updateGrafiek() {
+      const dataArray = Object.entries(tellingen)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
+      const labels = dataArray.map(item => item[0]);
+      const data = dataArray.map(item => item[1]);
+
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Aantal keer gekozen',
+            data: data,
+            backgroundColor: '#ffa726'
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Top 5 meest gekozen artikelen',
+              font: { size: 18 }
+            },
+            legend: { display: false }
+          },
+          scales: {
+            x: { beginAtZero: true }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
